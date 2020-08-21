@@ -19,50 +19,45 @@ class MainActivity : AppCompatActivity(), CameraBridgeViewBase.CvCameraViewListe
     private var TAG = "MainActivityOpenCV"
 
     private lateinit var mRGBA : Mat
-    private lateinit var mGray : Mat
-    private lateinit var mRGBAT : Mat
     private lateinit var javaCameraView : CameraBridgeViewBase
     private lateinit var cascadeClassifier: CascadeClassifier
     private lateinit var mCascadeFile : File
 
     override fun onCameraViewStarted(width: Int, height: Int) {
         mRGBA = Mat()
-        mGray = Mat()
-        Log.d(TAG, "height of images : ${height} and width : ${width}")
     }
 
     override fun onCameraViewStopped() {
         mRGBA.release()
-        mGray.release()
     }
 
     override fun onCameraFrame(inputFrame: CameraBridgeViewBase.CvCameraViewFrame): Mat {
         mRGBA = inputFrame.rgba()
 
-        mRGBAT = mRGBA.t()
-        Core.flip(mRGBA.t(), mRGBAT, 1)
-        Imgproc.resize(mRGBAT, mRGBAT, mRGBA.size())
+        Core.rotate(mRGBA , mRGBA , Core.ROTATE_90_COUNTERCLOCKWISE);
 
         // Detect faces
         val detectedFaces = MatOfRect()
-        cascadeClassifier.detectMultiScale(mRGBAT, detectedFaces)
+        cascadeClassifier.detectMultiScale(mRGBA, detectedFaces)
 
         // Draw rectangle for detected faces
         for (rect : Rect in detectedFaces.toArray()) {
-            Imgproc.rectangle(mRGBAT, Point(rect.x.toDouble(), rect.y.toDouble()),
+            Imgproc.rectangle(mRGBA, Point(rect.x.toDouble(), rect.y.toDouble()),
                 Point(rect.x.toDouble() + rect.width, rect.y.toDouble() + rect.height),
                 Scalar(255.0, 0.0, 0.0)
             )
         }
 
-        return mRGBAT
+        Core.rotate(mRGBA , mRGBA , Core.ROTATE_90_CLOCKWISE);
+        Core.flip(mRGBA, mRGBA, 1)
+
+        return mRGBA
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         setContentView(R.layout.activity_detection)
-
-        window.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN)
 
         if (OpenCVLoader.initDebug()) {
             Log.d(TAG, "OpenCV is Configured or Connected Successfully")
@@ -109,7 +104,7 @@ class MainActivity : AppCompatActivity(), CameraBridgeViewBase.CvCameraViewListe
                         Log.e(TAG, "Failed to load cascade. Exception thrown: $e")
                     }
 
-                    javaCameraView.setCameraIndex(CameraBridgeViewBase.CAMERA_ID_BACK)
+                    javaCameraView.setCameraIndex(CameraBridgeViewBase.CAMERA_ID_FRONT)
                     javaCameraView.enableView()
                 }
                 else ->
