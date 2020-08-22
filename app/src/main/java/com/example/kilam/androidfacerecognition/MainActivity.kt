@@ -13,6 +13,10 @@ import org.opencv.objdetect.CascadeClassifier
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
+import org.opencv.core.Scalar
+import com.example.kilam.androidfacerecognition.Custom.CameraBridgeViewBase
+import org.opencv.core.Core
+import android.content.pm.ActivityInfo
 
 class MainActivity : AppCompatActivity(), CameraBridgeViewBase.CvCameraViewListener2 {
 
@@ -22,37 +26,6 @@ class MainActivity : AppCompatActivity(), CameraBridgeViewBase.CvCameraViewListe
     private lateinit var javaCameraView : CameraBridgeViewBase
     private lateinit var cascadeClassifier: CascadeClassifier
     private lateinit var mCascadeFile : File
-
-    override fun onCameraViewStarted(width: Int, height: Int) {
-        mRGBA = Mat()
-    }
-
-    override fun onCameraViewStopped() {
-        mRGBA.release()
-    }
-
-    override fun onCameraFrame(inputFrame: CameraBridgeViewBase.CvCameraViewFrame): Mat {
-        mRGBA = inputFrame.rgba()
-
-        Core.rotate(mRGBA , mRGBA , Core.ROTATE_90_COUNTERCLOCKWISE);
-
-        // Detect faces
-        val detectedFaces = MatOfRect()
-        cascadeClassifier.detectMultiScale(mRGBA, detectedFaces)
-
-        // Draw rectangle for detected faces
-        for (rect : Rect in detectedFaces.toArray()) {
-            Imgproc.rectangle(mRGBA, Point(rect.x.toDouble(), rect.y.toDouble()),
-                Point(rect.x.toDouble() + rect.width, rect.y.toDouble() + rect.height),
-                Scalar(255.0, 0.0, 0.0)
-            )
-        }
-
-        Core.rotate(mRGBA , mRGBA , Core.ROTATE_90_CLOCKWISE);
-        Core.flip(mRGBA, mRGBA, 1)
-
-        return mRGBA
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -111,6 +84,52 @@ class MainActivity : AppCompatActivity(), CameraBridgeViewBase.CvCameraViewListe
                     super.onManagerConnected(status)
             }
         }
+    }
+
+
+    override fun onCameraViewStarted(width: Int, height: Int) {
+        mRGBA = Mat()
+    }
+
+    override fun onCameraViewStopped() {
+        mRGBA.release()
+    }
+
+    override fun onCameraFrame(inputFrame: CameraBridgeViewBase.CvCameraViewFrame): Mat {
+        mRGBA = inputFrame.rgba()
+
+        Core.rotate(mRGBA , mRGBA , Core.ROTATE_90_COUNTERCLOCKWISE)
+
+        // Detect faces
+        val detectedFaces = MatOfRect()
+        cascadeClassifier.detectMultiScale(mRGBA, detectedFaces)
+
+        // Draw rectangle for detected faces
+        for (rect : Rect in detectedFaces.toArray()) {
+            Imgproc.rectangle(mRGBA,
+                Point(rect.x.toDouble(), rect.y.toDouble()),
+                Point(rect.x.toDouble() + rect.width, rect.y.toDouble() + rect.height),
+                Scalar(0.0, 0.0, 255.0))
+        }
+
+        Core.rotate(mRGBA , mRGBA , Core.ROTATE_90_CLOCKWISE)
+
+        // Flip image to get mirror effect
+        val orientation = javaCameraView.getScreenOrientation()
+        if (javaCameraView.isEmulator)
+        // Treat emulators as a special case
+            Core.flip(mRGBA, mRGBA, 1) // Flip along y-axis
+        else {
+            when (orientation) {
+                // RGB image
+                ActivityInfo.SCREEN_ORIENTATION_PORTRAIT, ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT ->
+                    Core.flip(mRGBA, mRGBA,0) // Flip along x-axis
+                ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE, ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE ->
+                    Core.flip(mRGBA, mRGBA, 1) // Flip along y-axis
+            }
+        }
+
+        return mRGBA
     }
 
     override fun onDestroy() {

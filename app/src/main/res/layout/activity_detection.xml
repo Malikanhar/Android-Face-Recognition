@@ -10,7 +10,7 @@
                 android:paddingRight="16dp"
                 android:paddingTop="16dp">
 
-    <org.opencv.android.JavaCameraView
+    <com.example.kilam.androidfacerecognition.Custom.JavaCameraView
             android:id="@+id/opencv_camera"
             android:layout_width="fill_parent"
             android:layout_height="fill_parent"
