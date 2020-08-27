@@ -13,20 +13,29 @@
             android:id="@+id/iv_capture"
             android:layout_width="match_parent"
             android:layout_height="200dp"
+            android:background="@color/colorAccent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent"/>
 
     <EditText
             android:id="@+id/et_name"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="16dp"
+            android:paddingStart="16sp"
+            android:paddingEnd="16sp"
+            android:hint="Name"
+            android:background="@drawable/bg_edit_text"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toBottomOf="@id/iv_capture"/>
 
     <Button
             android:id="@+id/btn_save"
             style="@style/ButtonFloatShort"
             android:layout_width="0dp"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="8dp"
             android:text="Save"
             app:layout_constraintEnd_toStartOf="@id/btn_cancel"
             app:layout_constraintStart_toStartOf="parent"
@@ -36,7 +45,7 @@
             android:id="@+id/btn_cancel"
             style="@style/ButtonFloatShort"
             android:layout_width="0dp"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="8dp"
             android:layout_marginStart="16dp"
             android:text="Cancel"
             app:layout_constraintEnd_toEndOf="parent"

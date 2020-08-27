@@ -26,8 +26,8 @@
             android:id="@+id/btn_register"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Register New Face"
+            android:text="Add Person"
             app:layout_constraintBottom_toBottomOf="parent"
-            style="@style/buttonPrimary"/>
+            style="@style/ButtonFloatShort"/>
 
 </android.support.constraint.ConstraintLayout>

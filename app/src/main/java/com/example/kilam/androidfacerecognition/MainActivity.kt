@@ -20,13 +20,16 @@ import org.opencv.core.Core
 import android.content.pm.ActivityInfo
 import android.content.res.AssetFileDescriptor
 import android.graphics.Bitmap
+import android.support.constraint.ConstraintLayout
 import android.view.Window
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageView
+import android.widget.Toast
 import kotlinx.android.synthetic.main.activity_detection.*
 import org.tensorflow.lite.DataType
 import org.tensorflow.lite.Interpreter
+import org.tensorflow.lite.gpu.GpuDelegate
 import org.tensorflow.lite.support.common.ops.NormalizeOp
 import org.tensorflow.lite.support.image.ImageProcessor
 import org.tensorflow.lite.support.image.TensorImage
@@ -35,7 +38,6 @@ import org.tensorflow.lite.support.tensorbuffer.TensorBuffer
 import java.io.FileInputStream
 import java.nio.MappedByteBuffer
 import java.nio.channels.FileChannel
-import java.util.*
 import kotlin.collections.ArrayList
 
 class MainActivity : AppCompatActivity(), CameraBridgeViewBase.CvCameraViewListener2 {
@@ -43,13 +45,13 @@ class MainActivity : AppCompatActivity(), CameraBridgeViewBase.CvCameraViewListe
     private var TAG = "MainActivityOpenCV"
     private var MODEL_PATH = "MobileFacenet.tflite"
 
-    private var ID_CAMERA = CameraBridgeViewBase.CAMERA_ID_FRONT
+    private var ID_CAMERA = CameraBridgeViewBase.CAMERA_ID_BACK
 
     private lateinit var mRGBA : Mat
     private lateinit var javaCameraView : CameraBridgeViewBase
     private lateinit var cascadeClassifier: CascadeClassifier
     private lateinit var mCascadeFile : File
-    private lateinit var mBitmap: Bitmap
+    private var mBitmap: Bitmap? = null
 
     private lateinit var tfliteModel : MappedByteBuffer
     private lateinit var interpreter : Interpreter
@@ -85,7 +87,10 @@ class MainActivity : AppCompatActivity(), CameraBridgeViewBase.CvCameraViewListe
         javaCameraView.visibility = SurfaceView.VISIBLE
         javaCameraView.setCvCameraViewListener(this@MainActivity)
 
-        btn_register.setOnClickListener { showDialog() }
+        btn_register.setOnClickListener {
+            if (mBitmap!=null) showDialog()
+            else Toast.makeText(this@MainActivity, "No face detected", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun showDialog(){
@@ -95,6 +100,8 @@ class MainActivity : AppCompatActivity(), CameraBridgeViewBase.CvCameraViewListe
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
         dialog.setCancelable(false)
         dialog.setContentView(R.layout.dialog_register)
+        val window = dialog.window
+        window.setLayout(ConstraintLayout.LayoutParams.MATCH_PARENT, ConstraintLayout.LayoutParams.WRAP_CONTENT)
 
         val iv_person = dialog.findViewById(R.id.iv_capture) as ImageView
         iv_person.setImageBitmap(mBitmap)
@@ -104,7 +111,7 @@ class MainActivity : AppCompatActivity(), CameraBridgeViewBase.CvCameraViewListe
         val btnCancel  = dialog.findViewById(R.id.btn_cancel) as Button
 
         btnSave.setOnClickListener {
-            val embedding = getEmbedding(mBitmap)
+            val embedding = getEmbedding(mBitmap!!)
             val name = et_name.text.toString().trim()
             persons.add(Person(name, embedding))
             dialog.dismiss()
@@ -127,8 +134,11 @@ class MainActivity : AppCompatActivity(), CameraBridgeViewBase.CvCameraViewListe
         try{
             tfliteModel = loadModelFile()
 
+            val delegate = GpuDelegate(GpuDelegate.Options().setQuantizedModelsAllowed(true))
+            val options = (Interpreter.Options()).addDelegate(delegate)
+
             @Suppress("DEPRECATION")
-            interpreter = Interpreter(tfliteModel)
+            interpreter = Interpreter(tfliteModel, options)
 
             val probabilityTensorIndex = 0
             val probabilityShape = interpreter.getOutputTensor(probabilityTensorIndex).shape() // {1, EMBEDDING_SIZE}
@@ -158,11 +168,11 @@ class MainActivity : AppCompatActivity(), CameraBridgeViewBase.CvCameraViewListe
     private fun recognize(embedding : FloatArray) : String {
         return if (persons.isNotEmpty()){
             val similarities = ArrayList<Float>()
-            persons.forEach {
-                similarities.add(cosineSimilarity(it.embedding, embedding))
+            for (person in persons) {
+                similarities.add(cosineSimilarity(person.embedding, embedding))
             }
             val maxVal = similarities.max()!!
-            if (maxVal > 0.8) "${persons[similarities.indexOf(maxVal)].name} ${(maxVal * 100).toString().take(2)} %"
+            if (maxVal > 0.8) "${persons[similarities.indexOf(maxVal)].name} ${(maxVal * 100).toString().take(2)}%"
             else "unknown"
         } else "unknown"
     }
@@ -280,33 +290,46 @@ class MainActivity : AppCompatActivity(), CameraBridgeViewBase.CvCameraViewListe
 
         // Detect faces
         val detectedFaces = MatOfRect()
-        cascadeClassifier.detectMultiScale(mRGBA, detectedFaces, 1.1, 2, 2, Size(112.0, 112.0), Size())
+        cascadeClassifier.detectMultiScale(mRGBA, detectedFaces)
+        val rects = detectedFaces.toArray()
 
-        // Draw rectangle for detected faces
-        for (rect : Rect in detectedFaces.toArray()) {
-            val m = mRGBA.submat(rect)
-            mBitmap = Bitmap.createBitmap(m.width(),m.height(), Bitmap.Config.ARGB_8888)
-            Utils.matToBitmap(m, mBitmap)
-            val res = recognize(getEmbedding(mBitmap))
-            val scalar = if (res == "unknown") { Scalar(255.0, 0.0, 0.0) } else Scalar(0.0, 255.0, 0.0)
+        if (rects.isEmpty()){
+            mBitmap = null
+        } else {
+            // Draw rectangle for detected faces
+            for (rect: Rect in rects) {
+                val m = mRGBA.submat(rect)
+                mBitmap = Bitmap.createBitmap(m.width(), m.height(), Bitmap.Config.ARGB_8888)
+                Utils.matToBitmap(m, mBitmap)
+                val res = recognize(getEmbedding(mBitmap!!))
+                val scalar = if (res == "unknown") {
+                    Scalar(255.0, 0.0, 0.0)
+                } else Scalar(0.0, 255.0, 0.0)
 
-            Imgproc.rectangle(mRGBA,
-                Point(rect.x.toDouble(), rect.y.toDouble()),
-                Point(rect.x.toDouble() + rect.width, rect.y.toDouble() + rect.height),
-                scalar, 1)
+                Imgproc.rectangle(
+                    mRGBA,
+                    Point(rect.x.toDouble(), rect.y.toDouble()),
+                    Point(rect.x.toDouble() + rect.width, rect.y.toDouble() + rect.height),
+                    scalar, 1
+                )
 
-            Imgproc.putText(mRGBA,
-                res,
-                Point(rect.x.toDouble(), rect.y.toDouble() - 5.0),
-                2,
-                1.0,
-                scalar, 2)
+                Imgproc.putText(
+                    mRGBA,
+                    res,
+                    Point(rect.x.toDouble(), rect.y.toDouble() - 5.0),
+                    2,
+                    0.5,
+                    scalar, 2
+                )
+            }
         }
 
         Core.rotate(mRGBA , mRGBA , Core.ROTATE_90_CLOCKWISE)
 
         return mRGBA
     }
+
+
 
     override fun onDestroy() {
         super.onDestroy()
